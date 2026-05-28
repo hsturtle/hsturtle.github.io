@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Normify - Texture Map Generator</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7546055831883304" crossorigin="anonymous"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        body, html { width: 100%; height: 100dvh; margin: 0; padding: 0; overflow: hidden; background-color: #f8fafc; touch-action: manipulation; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; border: 2px solid #f1f5f9; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        #previewGrid::-webkit-scrollbar { width: 10px; }
+        #previewGrid::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; }
+        #previewGrid::-webkit-scrollbar-thumb { background: #64748b; border-radius: 5px; border: 2px solid #e2e8f0; }
+        #previewGrid::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .drag-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+        .checker-bg {
+            background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        }
+        
+        input[type=range] { height: 4px; border-radius: 2px; background: #e2e8f0; appearance: none; outline: none; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #2563eb; cursor: pointer; }
+    </style>
+</head>
+<body class="flex flex-col text-slate-800 font-sans relative">
+
+    <header class="h-[50px] md:h-[60px] shrink-0 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-3 md:px-6 relative z-20">
+        <div class="flex flex-col justify-center">
+            <div class="flex items-baseline gap-1.5">
+                <h1 class="text-lg md:text-2xl font-extrabold tracking-tight leading-none cursor-default">
+                    <span class="text-slate-800">Norm</span><span class="text-blue-600">ify</span>
+                </h1>
+                <span class="text-[10px] md:text-xs text-slate-400 font-medium" id="t_pronounce"></span>
+            </div>
+            <p class="text-[9px] md:text-[11px] text-slate-500 mt-0.5 truncate" id="t_subtitle">Generate Normal & Displacement</p>
+        </div>
+        <a href="https://github.com/sponsors/hsturtle" target="_blank" class="shrink-0 bg-pink-50 hover:bg-pink-100 text-pink-700 text-[10px] md:text-xs font-bold py-1 md:py-1.5 px-2 md:px-3 rounded border border-pink-200 transition-colors shadow-sm flex items-center gap-1.5 whitespace-nowrap" title="Support Developer on GitHub">
+            <span>💖</span>
+            <span id="t_support_btn">Support</span>
+        </a>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row overflow-hidden p-1.5 md:p-4 gap-1.5 md:gap-4 relative z-0">
+        
+        <aside class="w-full md:w-64 shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            <div class="flex flex-row md:flex-col p-1.5 md:p-3 gap-1.5 md:gap-3 flex-grow md:flex-grow-0">
+                <div id="dropZone" class="flex-1 md:flex-none border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 transition-colors h-[85px] md:h-32 shrink-0 bg-slate-50/30">
+                    <svg class="w-5 h-5 md:w-8 md:h-8 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3-3m3-3v12"></path></svg>
+                    <p class="text-[10px] md:text-sm font-medium text-slate-600 leading-tight" id="t_upload">Upload Images</p>
+                    <input type="file" id="fileInput" multiple accept="image/*" class="hidden">
+                </div>
+
+                <div class="flex-1 md:flex-none flex flex-col gap-1.5 md:gap-3 justify-between min-w-0">
+                    <div class="flex flex-col gap-1 overflow-hidden">
+                        <button id="savePresetBtn" class="shrink-0 w-full py-1 md:py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[9px] md:text-xs font-medium rounded transition-colors flex items-center justify-center gap-1 shadow-sm">
+                            <svg class="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                            <span id="t_save_preset" class="truncate">Save My Preset</span>
+                        </button>
+                        <div id="presetContainer" class="flex flex-row md:flex-wrap overflow-x-auto gap-1 items-center no-scrollbar pb-0.5 w-full"></div>
+                    </div>
+
+                    <button id="downloadBtn" disabled class="shrink-0 w-full py-1.5 md:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[10px] md:text-sm font-bold rounded shadow-sm transition-colors flex items-center justify-center gap-1">
+                        <svg class="w-3 h-3 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span id="t_download" class="truncate">Download ZIP</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <section class="flex-grow w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[250px]">
+            <div class="h-7 md:h-10 border-b border-slate-100 flex items-center px-2 md:px-4 justify-between bg-slate-50 shrink-0">
+                <h2 class="text-[10px] md:text-sm font-bold text-slate-700" id="t_preview">Preview Workspace</h2>
+                <span id="statusText" class="text-[8px] md:text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full hidden">Processing...</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 md:gap-4 p-2 md:p-3 bg-white border-b border-slate-200 shrink-0 shadow-sm z-10 relative">
+                <div class="flex flex-col justify-center min-w-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[9px] md:text-xs font-bold text-slate-700 truncate pr-1" id="t_blur">Blur</label>
+                        <span id="blurVal" class="text-[8px] md:text-xs font-mono text-slate-500 bg-slate-100 px-1 rounded shrink-0">2px</span>
+                    </div>
+                    <input type="range" id="blurInput" min="0" max="10" step="0.5" value="2" class="w-full">
+                </div>
+                <div class="flex flex-col justify-center min-w-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[9px] md:text-xs font-bold text-slate-700 truncate pr-1" id="t_normal">Normal Str.</label>
+                        <span id="normalVal" class="text-[8px] md:text-xs font-mono text-slate-500 bg-slate-100 px-1 rounded shrink-0">5.0</span>
+                    </div>
+                    <input type="range" id="normalInput" min="0.1" max="20" step="0.1" value="5" class="w-full">
+                </div>
+                <div class="flex flex-col justify-center min-w-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[9px] md:text-xs font-bold text-slate-700 truncate pr-1" id="t_disp">Displacement</label>
+                        <span id="dispVal" class="text-[8px] md:text-xs font-mono text-slate-500 bg-slate-100 px-1 rounded shrink-0">100</span>
+                    </div>
+                    <input type="range" id="dispInput" min="10" max="255" step="1" value="100" class="w-full">
+                </div>
+            </div>
+            
+            <div id="previewGrid" class="flex-grow overflow-y-scroll p-2 md:p-4 grid grid-cols-1 xl:grid-cols-2 gap-2 md:gap-4 items-start content-start bg-slate-50/50">
+                <div id="emptyState" class="col-span-full h-full min-h-[150px] flex flex-col items-center justify-center text-slate-400">
+                    <svg class="w-8 h-8 md:w-12 md:h-12 mb-1 md:mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <p class="text-[10px] md:text-sm" id="t_empty_msg">No images uploaded yet.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="h-[45px] md:h-[70px] shrink-0 bg-white border-t border-slate-200 shadow-[0_-1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center p-1 md:p-2 relative z-10">
+        <div class="w-full max-w-6xl h-full bg-slate-100 flex items-center justify-center border border-slate-200 border-dashed rounded text-slate-400 text-[10px] md:text-sm">
+            <span id="t_adsense">광고 배너 영역 (Advertisement)</span>
+        </div>
+    </footer>
+
+    <script id="workerTemplate" type="javascript/worker">
+        self.onmessage = function(e) {
+            const { imgData, width, height, normalStrength, dispStrength } = e.data;
+            const data = imgData.data;
+            const len = data.length;
+            const normalData = new Uint8ClampedArray(len);
+            const dispData = new Uint8ClampedArray(len);
+            const grayData = new Float32Array(width * height);
+            
+            for (let i = 0; i < len; i += 4) {
+                const gray = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+                grayData[i/4] = gray;
+                const factor = (259 * (dispStrength + 255)) / (255 * (259 - dispStrength));
+                let disp = factor * (gray - 128) + 128;
+                dispData[i] = dispData[i+1] = dispData[i+2] = Math.max(0, Math.min(255, disp)); 
+                dispData[i+3] = 255;
+            }
+
+            const strength = normalStrength; 
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+                        normalData[idx] = normalData[idx+1] = 128; normalData[idx+2] = normalData[idx+3] = 255; continue;
+                    }
+                    const tl = grayData[(y-1)*width + (x-1)], tc = grayData[(y-1)*width + x], tr = grayData[(y-1)*width + (x+1)];
+                    const cl = grayData[y*width + (x-1)], cr = grayData[y*width + (x+1)];
+                    const bl = grayData[(y+1)*width + (x-1)], bc = grayData[(y+1)*width + x], br = grayData[(y+1)*width + (x+1)];
+                    const dX = (tr + 2*cr + br) - (tl + 2*cl + bl), dY = (bl + 2*bc + br) - (tl + 2*tc + tr);
+                    const nX = -dX * (strength / 10), nY = -dY * (strength / 10), nZ = 255.0; 
+                    const length = Math.sqrt(nX*nX + nY*nY + nZ*nZ);
+
+                    normalData[idx] = Math.max(0, Math.min(255, ((nX/length) * 0.5 + 0.5) * 255));
+                    normalData[idx+1] = Math.max(0, Math.min(255, ((nY/length) * 0.5 + 0.5) * 255));
+                    normalData[idx+2] = Math.max(0, Math.min(255, (nZ/length) * 255)); normalData[idx+3] = 255; 
+                }
+            }
+            self.postMessage({ normalData, dispData }, [normalData.buffer, dispData.buffer]);
+        };
+    </script>
+
+    <script>
+        const dictionary = {
+            en: { adsense: "Advertisement Banner Placeholder", subtitle: "Generate Normal & Displacement", pronounce: "", upload: "Upload", blur: "Blur", normal: "Normal Str.", disp: "Displacement", save_preset: "Save Custom Preset", download: "Download ZIP", preview: "Workspace", empty_msg: "No images uploaded yet.", processing: "Processing...", preset_name_prompt: "Enter a name for your preset:", file_original: "Original", file_normal: "Normal Map", file_disp: "Displacement", p_soft: "Soft", p_std: "Standard", p_strong: "Strong", support_btn: "Support" },
+            ko: { adsense: "광고 배너 (Advertisement)", subtitle: "노멀 맵 및 디스플레이스먼트 자동 생성", pronounce: "(노미파이)", upload: "업로드", blur: "블러 (Blur)", normal: "노멀 강도 (Normal)", disp: "디스플레이스먼트 (Displacement)", save_preset: "내 프리셋 저장", download: "ZIP 다운로드", preview: "미리보기", empty_msg: "업로드된 이미지가 없습니다.", processing: "처리 중...", preset_name_prompt: "저장할 프리셋의 이름을 입력하세요:", file_original: "원본", file_normal: "노멀 맵", file_disp: "디스플레이스먼트", p_soft: "부드러운 (Soft)", p_std: "기본 (Std)", p_strong: "강한 (Strong)", support_btn: "후원하기" },
+            ja: { adsense: "広告バナー (Advertisement)", subtitle: "ノーマル＆ディスプレイスメント自動生成", pronounce: "(ノーミファイ)", upload: "アップロード", blur: "ぼかし (Blur)", normal: "ノーマル強度", disp: "ディスプレイスメント", save_preset: "マイプリセットを保存", download: "ZIPをダウンロード", preview: "プレビュー", empty_msg: "アップロードされた画像がありません。", processing: "処理中...", preset_name_prompt: "プリセット名を入力してください:", file_original: "オリジナル", file_normal: "ノーマルマップ", file_disp: "ディスプレイスメント", p_soft: "ソフト", p_std: "標準", p_strong: "強い", support_btn: "支援する" },
+            zh: { adsense: "广告横幅 (Advertisement)", subtitle: "自动生成法线与置换贴图", pronounce: "", upload: "上传图片", blur: "模糊 (Blur)", normal: "法线强度", disp: "置换贴图", save_preset: "保存我的预设", download: "下载 ZIP", preview: "预览", empty_msg: "暂无上传的图片。", processing: "处理中...", preset_name_prompt: "请输入预设名称:", file_original: "原图", file_normal: "法线贴图", file_disp: "置换贴图", p_soft: "柔和", p_std: "标准", p_strong: "强烈", support_btn: "支持作者" },
+            es: { adsense: "Banner de publicidad (Advertisement)", subtitle: "Generar mapas Normal y Displacement", pronounce: "", upload: "Subir", blur: "Desenfocar", normal: "Fuerza Normal", disp: "Desplazamiento", save_preset: "Guardar mi preset", download: "Descargar ZIP", preview: "Vista previa", empty_msg: "No se han subido imágenes.", processing: "Procesando...", preset_name_prompt: "Ingrese un nombre para su preset:", file_original: "Original", file_normal: "Mapa Normal", file_disp: "Desplazamiento", p_soft: "Suave", p_std: "Estándar", p_strong: "Fuerte", support_btn: "Apoyar" }
+        };
+
+        let userLang = 'en'; 
+        const browserLang = navigator.language.toLowerCase();
+        if (browserLang.startsWith('ko')) userLang = 'ko';
+        else if (browserLang.startsWith('ja')) userLang = 'ja';
+        else if (browserLang.startsWith('zh')) userLang = 'zh';
+        else if (browserLang.startsWith('es')) userLang = 'es';
+
+        const t = dictionary[userLang];
+        document.querySelectorAll('[id^="t_"]').forEach(el => { 
+            if (t[el.id.replace('t_', '')] !== undefined) {
+                el.textContent = t[el.id.replace('t_', '')]; 
+            }
+        });
+
+        const workerScript = document.getElementById('workerTemplate').textContent;
+        const workerBlob = new Blob([workerScript], { type: "text/javascript" });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        
+        let worker; 
+        function initWorker() {
+            if (worker) worker.terminate(); 
+            worker = new Worker(workerUrl);
+        }
+        initWorker(); 
+
+        const ui = {
+            dropZone: document.getElementById('dropZone'), fileInput: document.getElementById('fileInput'),
+            blurInput: document.getElementById('blurInput'), normalInput: document.getElementById('normalInput'), dispInput: document.getElementById('dispInput'),
+            blurVal: document.getElementById('blurVal'), normalVal: document.getElementById('normalVal'), dispVal: document.getElementById('dispVal'),
+            presetContainer: document.getElementById('presetContainer'), savePresetBtn: document.getElementById('savePresetBtn'),
+            downloadBtn: document.getElementById('downloadBtn'), previewGrid: document.getElementById('previewGrid'),
+            emptyState: document.getElementById('emptyState'), statusText: document.getElementById('statusText')
+        };
+
+        const workCanvas = document.createElement('canvas');
+        const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+        let loadedImagesCache = [], processedFiles = [], currentProcessingQueue = [];
+
+        const updateSliderVals = () => {
+            ui.blurVal.textContent = ui.blurInput.value + 'px'; ui.normalVal.textContent = ui.normalInput.value; ui.dispVal.textContent = ui.dispInput.value;
+        };
+
+        let debounceTimer;
+        [ui.blurInput, ui.normalInput, ui.dispInput].forEach(el => {
+            el.addEventListener('input', () => {
+                updateSliderVals();
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => { 
+                    if(loadedImagesCache.length > 0) {
+                        initWorker(); 
+                        reprocessAll(); 
+                    }
+                }, 300); 
+            });
+        });
+
+        ui.dropZone.addEventListener('dragover', (e) => { e.preventDefault(); ui.dropZone.classList.add('drag-active'); });
+        ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-active'));
+        ui.dropZone.addEventListener('drop', (e) => { e.preventDefault(); ui.dropZone.classList.remove('drag-active'); handleFiles(e.dataTransfer.files); });
+        ui.dropZone.addEventListener('click', () => ui.fileInput.click());
+        ui.fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        
+        async function handleFiles(files) {
+            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+            
+            ui.emptyState.classList.add('hidden'); ui.downloadBtn.disabled = true; 
+            ui.statusText.classList.remove('hidden'); ui.statusText.textContent = "Loading...";
+
+            const loadPromises = imageFiles.map(file => {
+                return new Promise((resolve) => {
+                    const img = new Image(); const objectUrl = URL.createObjectURL(file);
+                    img.onload = () => resolve({ name: file.name.split('.')[0], img: img, origUrl: objectUrl });
+                    img.src = objectUrl;
+                });
+            });
+            loadedImagesCache = await Promise.all(loadPromises); 
+            ui.fileInput.value = ''; 
+            initWorker(); 
+            reprocessAll();
+        }
+
+        function reprocessAll() {
+            if(loadedImagesCache.length === 0) return;
+            processedFiles.forEach(file => { if (file.normalSrc) URL.revokeObjectURL(file.normalSrc); if (file.dispSrc) URL.revokeObjectURL(file.dispSrc); });
+            processedFiles = []; ui.previewGrid.innerHTML = ''; currentProcessingQueue = [...loadedImagesCache]; processNextImage();
+        }
+
+        function processNextImage() {
+            if (currentProcessingQueue.length === 0) { ui.statusText.classList.add('hidden'); ui.downloadBtn.disabled = false; return; }
+            ui.statusText.classList.remove('hidden'); ui.statusText.textContent = `${t.processing} (${processedFiles.length + 1}/${loadedImagesCache.length})`;
+            const currentItem = currentProcessingQueue.shift(); processImageWithWorker(currentItem.img, currentItem.origUrl, currentItem.name);
+        }
+
+        function processImageWithWorker(img, origUrl, name) {
+            workCanvas.width = img.width; workCanvas.height = img.height;
+            const blurVal = parseFloat(ui.blurInput.value); 
+            workCtx.filter = blurVal > 0 ? `blur(${blurVal}px)` : 'none'; 
+            workCtx.drawImage(img, 0, 0); 
+            const imgData = workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height);
+            
+            worker.onmessage = function(e) {
+                const { normalData, dispData } = e.data;
+                const createBlobUrl = (dataArray) => new Promise(resolve => {
+                    workCtx.putImageData(new ImageData(new Uint8ClampedArray(dataArray), workCanvas.width, workCanvas.height), 0, 0);
+                    workCanvas.toBlob(blob => resolve(URL.createObjectURL(blob)), 'image/png');
+                });
+                
+                Promise.all([createBlobUrl(normalData), createBlobUrl(dispData)]).then(([normalUrl, dispUrl]) => {
+                    processedFiles.push({ name: name, originalSrc: origUrl, normalSrc: normalUrl, dispSrc: dispUrl });
+                    renderPreview(processedFiles[processedFiles.length - 1]); processNextImage();
+                });
+            };
+            
+            worker.postMessage({ imgData: imgData, width: workCanvas.width, height: workCanvas.height, normalStrength: parseFloat(ui.normalInput.value), dispStrength: parseFloat(ui.dispInput.value) });
+        }
+
+        function renderPreview(data) {
+            const card = document.createElement('div'); 
+            card.className = 'bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col gap-1.5 md:gap-3 h-auto md:h-[320px] shrink-0';
+            
+            const createImgBlock = (src, label, downloadName) => `
+                <div class="flex flex-col gap-0.5 md:gap-1 min-h-[50px] md:h-full">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[8px] md:text-xs font-semibold text-slate-500 truncate">${label}</span>
+                        ${downloadName ? `
+                        <a href="${src}" download="${downloadName}" class="text-blue-500 hover:text-blue-700 transition-colors p-0.5 md:p-1 bg-blue-50 hover:bg-blue-100 rounded" title="Download ${label}">
+                            <svg class="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        </a>` : ''}
+                    </div>
+                    <div class="flex-grow rounded overflow-hidden border border-slate-200 checker-bg flex items-center justify-center bg-slate-50 relative min-h-[40px]">
+                        <img src="${src}" class="absolute inset-0 w-full h-full object-contain p-0.5 md:p-1" alt="${label}">
+                    </div>
+                </div>`;
+                
+            card.innerHTML = `
+                <h4 class="font-bold text-[10px] md:text-sm text-slate-800 truncate" title="${data.name}">${data.name}</h4>
+                <div class="flex-grow grid grid-cols-3 gap-1.5 md:gap-3 min-h-[60px] md:min-h-0">
+                    ${createImgBlock(data.originalSrc, t.file_original, null)}
+                    ${createImgBlock(data.normalSrc, t.file_normal, `${data.name}_Normal.png`)}
+                    ${createImgBlock(data.dispSrc, t.file_disp, `${data.name}_Displacement.png`)}
+                </div>`;
+                
+            ui.previewGrid.appendChild(card);
+        }
+
+        ui.downloadBtn.addEventListener('click', async () => {
+            ui.downloadBtn.disabled = true;
+            const zip = new JSZip();
+            const fetchBlob = async (url) => { const res = await fetch(url); return await res.blob(); };
+            
+            for (const file of processedFiles) {
+                const folder = zip.folder(file.name);
+                folder.file(`${file.name}_Normal.png`, await fetchBlob(file.normalSrc));
+                folder.file(`${file.name}_Displacement.png`, await fetchBlob(file.dispSrc));
+            }
+            
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                const link = document.createElement('a'); const zipUrl = URL.createObjectURL(content);
+                link.href = zipUrl; link.download = `TextureMaps_${new Date().getTime()}.zip`; link.click(); 
+                URL.revokeObjectURL(zipUrl); 
+                ui.downloadBtn.disabled = false;
+            });
+        });
+
+        const PRESET_KEY = 'texture_user_preset';
+        const defaultPresets = [ { name: t.p_soft, blur: 4, normal: 3, disp: 60 }, { name: t.p_std, blur: 2, normal: 6, disp: 120 }, { name: t.p_strong, blur: 0.5, normal: 15, disp: 200 } ];
+
+        function applyPreset(preset) { ui.blurInput.value = preset.blur; ui.normalInput.value = preset.normal; ui.dispInput.value = preset.disp; updateSliderVals(); if(loadedImagesCache.length > 0) { initWorker(); reprocessAll(); } }
+
+        function loadPresets() {
+            ui.presetContainer.innerHTML = '';
+            defaultPresets.forEach(preset => {
+                const btn = document.createElement('button'); btn.className = 'px-1.5 py-1 md:py-1.5 bg-slate-100 text-slate-600 text-[8px] md:text-[11px] font-semibold rounded hover:bg-slate-200 transition-colors border border-slate-200 whitespace-nowrap shrink-0 shadow-sm'; btn.textContent = preset.name; btn.onclick = () => applyPreset(preset); ui.presetContainer.appendChild(btn);
+            });
+            const savedUserPreset = JSON.parse(localStorage.getItem(PRESET_KEY));
+            if (savedUserPreset) {
+                const userBtn = document.createElement('button'); userBtn.className = 'px-1.5 py-1 md:py-1.5 bg-blue-50 text-blue-700 text-[8px] md:text-[11px] font-bold rounded hover:bg-blue-100 transition-colors border border-blue-300 whitespace-nowrap shrink-0 shadow-sm'; userBtn.textContent = `⭐ ${savedUserPreset.name}`; userBtn.title = "우클릭하여 삭제";
+                userBtn.onclick = () => applyPreset(savedUserPreset);
+                userBtn.oncontextmenu = (e) => { e.preventDefault(); if(confirm(`'${savedUserPreset.name}' 프리셋을 삭제하시겠습니까?`)) { localStorage.removeItem(PRESET_KEY); loadPresets(); } };
+                ui.presetContainer.appendChild(userBtn);
+            }
+        }
+
+        ui.savePresetBtn.addEventListener('click', () => {
+            const name = prompt(t.preset_name_prompt, "My Custom"); if (!name) return;
+            const presetData = { name: name, blur: ui.blurInput.value, normal: ui.normalInput.value, disp: ui.dispInput.value }; localStorage.setItem(PRESET_KEY, JSON.stringify(presetData)); loadPresets();
+        });
+
+        updateSliderVals(); loadPresets();
+    </script>
+</body>
+</html>
