@@ -132,16 +132,30 @@
         <script src="https://www.highperformanceformat.com/8014cbdb9bdea197b934251b2d64a6e5/invoke.js"></script>
     </footer>
 
-    <div id="imageModal" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
-        <div class="relative w-full max-w-5xl max-h-[95vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="modalContent">
-            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-                <h3 id="modalTitle" class="text-sm md:text-base font-bold text-slate-800">Preview</h3>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-800 p-1 rounded-md hover:bg-slate-200 transition-colors">
+    <div id="imageModal" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 opacity-0 transition-opacity duration-300">
+        <div class="relative w-full max-w-5xl h-[90vh] md:h-[85vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="modalContent">
+            <div class="flex justify-between items-center p-2 md:p-3 border-b border-slate-200 bg-white shrink-0 z-10 shadow-sm relative">
+                <div class="flex items-center gap-3 md:gap-4">
+                    <h3 id="modalTitle" class="text-sm md:text-base font-bold text-slate-800 hidden sm:block">Preview</h3>
+                    <div class="flex items-center bg-slate-50 border border-slate-200 rounded-md shadow-sm text-[10px] md:text-xs text-slate-600 overflow-hidden select-none">
+                        <button onclick="changeZoom(-0.2)" class="px-2.5 py-1.5 hover:bg-slate-200 transition-colors" title="Zoom Out">
+                            <svg class="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        </button>
+                        <span id="zoomText" class="px-1 py-1.5 w-12 text-center border-x border-slate-200 font-mono bg-white">100%</span>
+                        <button onclick="changeZoom(0.2)" class="px-2.5 py-1.5 hover:bg-slate-200 transition-colors" title="Zoom In">
+                            <svg class="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                        <button onclick="resetZoom()" class="px-2.5 py-1.5 font-medium hover:bg-slate-200 border-l border-slate-200 transition-colors bg-white">Reset</button>
+                    </div>
+                    <span class="hidden md:inline text-[10px] text-slate-400">마우스 휠: 확대/축소 | 드래그: 이동</span>
+                </div>
+                <button onclick="closeModal()" class="text-slate-500 hover:text-rose-600 p-1.5 rounded-md hover:bg-rose-50 transition-colors">
                     <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-4 md:p-6 flex-grow overflow-auto checker-bg flex justify-center items-center bg-slate-100">
-                <img id="modalImage" src="" class="max-w-full max-h-[75vh] object-contain shadow-md border border-slate-200 bg-white" alt="Enlarged preview">
+            
+            <div id="modalImgContainer" class="relative flex-grow overflow-hidden checker-bg bg-slate-100 cursor-grab flex items-center justify-center touch-none">
+                <img id="modalImage" src="" class="max-w-full max-h-full object-contain shadow-md border border-slate-200 bg-white origin-center" style="transform: scale(1) translate(0px, 0px);" alt="Enlarged preview" draggable="false">
             </div>
         </div>
     </div>
@@ -318,7 +332,6 @@
             const card = document.createElement('div'); 
             card.className = 'bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col gap-1.5 md:gap-3 h-auto md:h-[320px] shrink-0';
             
-            // 🌟 이미지 컨테이너에 hover 효과와 onclick 이벤트(openModal)를 추가했습니다 🌟
             const createImgBlock = (src, label, downloadName) => `
                 <div class="flex flex-col gap-0.5 md:gap-1 min-h-[50px] md:h-full">
                     <div class="flex justify-between items-center">
@@ -394,46 +407,92 @@
 
         updateSliderVals(); loadPresets();
 
-        // 🌟 모달(Lightbox) 열기/닫기 로직 🌟
+        // 🌟 모달 줌 & 팬 로직 🌟
         const modal = document.getElementById('imageModal');
         const modalImg = document.getElementById('modalImage');
         const modalTitle = document.getElementById('modalTitle');
         const modalContent = document.getElementById('modalContent');
+        const modalContainer = document.getElementById('modalImgContainer');
+        const zoomText = document.getElementById('zoomText');
+
+        let currentScale = 1;
+        let isPanning = false;
+        let startX = 0, startY = 0;
+        let translateX = 0, translateY = 0;
+
+        function updateTransform() {
+            modalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+            zoomText.textContent = Math.round(currentScale * 100) + '%';
+        }
+
+        window.changeZoom = function(delta) {
+            currentScale += delta;
+            if (currentScale < 0.2) currentScale = 0.2;
+            if (currentScale > 8) currentScale = 8; // 최대 800%
+            updateTransform();
+        };
+
+        window.resetZoom = function() {
+            currentScale = 1; translateX = 0; translateY = 0;
+            updateTransform();
+            modalContainer.style.cursor = 'grab';
+        };
 
         window.openModal = function(src, title) {
-            modalImg.src = src;
-            modalTitle.textContent = title;
+            modalImg.src = src; modalTitle.textContent = title;
+            resetZoom();
             modal.classList.remove('hidden');
-            // 약간의 딜레이를 주어 transition 애니메이션이 자연스럽게 적용되도록 함
             setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modal.classList.add('opacity-100');
-                modalContent.classList.remove('scale-95');
-                modalContent.classList.add('scale-100');
+                modal.classList.remove('opacity-0'); modal.classList.add('opacity-100');
+                modalContent.classList.remove('scale-95'); modalContent.classList.add('scale-100');
             }, 10);
         };
 
         window.closeModal = function() {
-            modal.classList.remove('opacity-100');
-            modal.classList.add('opacity-0');
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modalImg.src = '';
-            }, 300);
+            modal.classList.remove('opacity-100'); modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100'); modalContent.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); modalImg.src = ''; }, 300);
         };
 
-        // 배경(어두운 부분) 클릭 시 닫기
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
+        // 이벤트 리스너 (마우스 휠, 드래그 팬)
+        modalContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 0.15 : -0.15;
+            changeZoom(delta);
+        }, { passive: false });
+
+        modalContainer.addEventListener('mousedown', (e) => {
+            e.preventDefault(); isPanning = true;
+            startX = e.clientX - translateX; startY = e.clientY - translateY;
+            modalContainer.style.cursor = 'grabbing';
         });
-        // ESC 키 누르면 닫기
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-                closeModal();
+
+        modalContainer.addEventListener('mousemove', (e) => {
+            if (!isPanning) return; e.preventDefault();
+            translateX = e.clientX - startX; translateY = e.clientY - startY;
+            updateTransform();
+        });
+
+        const stopPan = () => { isPanning = false; modalContainer.style.cursor = 'grab'; };
+        modalContainer.addEventListener('mouseup', stopPan);
+        modalContainer.addEventListener('mouseleave', stopPan);
+
+        // 터치 지원 (모바일 드래그)
+        modalContainer.addEventListener('touchstart', (e) => {
+            if(e.touches.length === 1) {
+                isPanning = true;
+                startX = e.touches[0].clientX - translateX; startY = e.touches[0].clientY - translateY;
             }
-        });
+        }, {passive: true});
+        modalContainer.addEventListener('touchmove', (e) => {
+            if (!isPanning || e.touches.length !== 1) return;
+            translateX = e.touches[0].clientX - startX; translateY = e.touches[0].clientY - startY;
+            updateTransform();
+        }, {passive: true});
+        modalContainer.addEventListener('touchend', stopPan);
+
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
     </script>
 </body>
 </html>
